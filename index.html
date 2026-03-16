@@ -177,7 +177,6 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
     <button id="btnCompact" onclick="setViewMode('compact')">Compact</button>
     <button id="btnCoreFlow" onclick="setViewMode('core')">Core</button>
   </div>
-  <button class="compact-btn" onclick="exportSchemaJson()" title="Push changes to GitHub">Push Changes</button>
   <input type="text" class="search-box" id="searchBox" placeholder="Search tables..." oninput="filterTables()">
   <div class="stats">
     <span><span class="num" id="statTables">0</span> tables</span>
@@ -197,7 +196,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
   </div>
   <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="display:none">&laquo;</button>
   <div class="sidebar" id="sidebar">
-    <h2 style="display:flex;align-items:center;justify-content:space-between">Change Log <button onclick="exportChangelogCsv()" style="font-size:11px;background:none;border:1px solid #2a2a3a;color:#888;cursor:pointer;padding:3px 10px;border-radius:4px">Export CSV</button></h2>
+    <h2 style="display:flex;align-items:center;justify-content:space-between">Change Log <button onclick="exportSchemaJson()" style="font-size:11px;background:none;border:1px solid #2a2a3a;color:#888;cursor:pointer;padding:3px 10px;border-radius:4px">Save to Git</button></h2>
     <div id="diffContent"><p class="no-diff">Switch to V2 to see differences.</p></div>
     <div id="sidebarActions" style="margin-top:16px;display:none;">
       <button class="add-table-btn" onclick="openAddTable()" style="width:100%">+ Add Table</button>
