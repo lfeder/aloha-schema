@@ -1013,12 +1013,13 @@ function renderChangelog(diffs, container) {
     </tr></thead><tbody>`;
   for (const r of sorted) {
     const safeDetail = r.detail.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    html += `<tr>
+    const clickable = schemaV2.tables[r.table] ? ` onclick="openEditTable('${r.table}')" style="cursor:pointer"` : '';
+    html += `<tr${clickable}>
       <td class="cl-table">${r.table}</td>
       <td><span class="cl-type ${r.type}">${r.type}</span></td>
       <td>${r.detail}</td>
       <td class="cl-notes" title="${(r.notes || '').replace(/"/g, '&quot;')}">${r.notes || ''}</td>
-      <td><button onclick="revertChange('${r.table}','${r.type}','${safeDetail}')" style="background:none;border:1px solid #2a2a3a;color:#e74c3c;cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px" title="Revert this change">&times;</button></td>
+      <td><button onclick="event.stopPropagation();revertChange('${r.table}','${r.type}','${safeDetail}')" style="background:none;border:1px solid #2a2a3a;color:#e74c3c;cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px" title="Revert this change">&times;</button></td>
     </tr>`;
   }
   html += '</tbody></table>';
