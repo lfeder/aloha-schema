@@ -167,7 +167,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
 
 <div class="topbar">
   <h1>Aloha Schema</h1>
-  <span style="font-size:10px;color:#999">v: 03-16 02:15</span>
+  <span style="font-size:10px;color:#999">v: 03-16 02:25</span>
   <div class="version-toggle">
     <button id="btnV1" onclick="setVersion('v1')">V1</button>
     <button id="btnV2" class="active" onclick="setVersion('v2')">V2</button>
@@ -843,10 +843,13 @@ function updatePersistIndicator(status) {
   if (status === 'saved') setTimeout(() => { el.textContent = ''; }, 1500);
 }
 
-// Load on startup: try JSON file first, then localStorage
+// Load on startup: try git CSV first, then localStorage
 loadFromGit().then(loaded => {
   if (!loaded) loadFromStorage();
   render();
+  const notesCount = Object.values(schemaV2.tables).filter(t => t.notes && t.notes.trim()).length;
+  document.getElementById('persistStatus').textContent = loaded ? `git: ${notesCount} notes` : 'git: failed, using local';
+  document.getElementById('persistStatus').style.color = loaded ? '#2A9D8F' : '#E0C45A';
 });
 
 function setViewMode(mode) {
