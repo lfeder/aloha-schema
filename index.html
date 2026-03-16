@@ -174,7 +174,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
   </div>
   <button id="btnCompact" class="compact-btn" onclick="toggleCompact()">Compact</button>
   <button id="btnCoreFlow" class="compact-btn" onclick="toggleCoreFlow()">Core Flow</button>
-  <button class="compact-btn" onclick="exportSchemaJson()" title="Download schema-v2.json for committing to git">Save JSON</button>
+  <button class="compact-btn" onclick="exportSchemaJson()" title="Push changes to GitHub">Push Changes</button>
   <input type="text" class="search-box" id="searchBox" placeholder="Search tables..." oninput="filterTables()">
   <div class="stats">
     <span><span class="num" id="statTables">0</span> tables</span>
@@ -1019,21 +1019,86 @@ function exportChangelogCsv() {
   URL.revokeObjectURL(a.href);
 }
 
-function exportSchemaJson() {
-  const blob = new Blob([JSON.stringify(schemaV2, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'schema-v2.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+const GITHUB_REPO = 'lfeder/aloha-schema';
+const GITHUB_FILE = 'schema-changes.json';
+const GH_TOKEN_KEY = 'aloha_gh_token';
+
+function getChangesPayload() {
+  const diffs = computeDiff(schemaV1, schemaV2);
+  const rows = buildChangelogRows(diffs);
+  return {
+    exported_at: new Date().toISOString(),
+    changes: rows
+  };
+}
+
+async function exportSchemaJson() {
+  let token = localStorage.getItem(GH_TOKEN_KEY);
+  if (!token) {
+    token = prompt('Enter a GitHub personal access token (needs repo scope).\nThis is stored in your browser only.');
+    if (!token) return;
+    localStorage.setItem(GH_TOKEN_KEY, token);
+  }
+
+  const payload = getChangesPayload();
+  if (!payload.changes.length) { alert('No changes to save.'); return; }
+
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+
+  try {
+    // Get current file SHA if it exists
+    let sha;
+    const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (getRes.ok) {
+      const existing = await getRes.json();
+      sha = existing.sha;
+    }
+
+    const body = {
+      message: 'Update schema changes',
+      content,
+      branch: 'main'
+    };
+    if (sha) body.sha = sha;
+
+    const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (putRes.ok) {
+      updatePersistIndicator('saved');
+      alert('Changes pushed to GitHub.');
+    } else {
+      const err = await putRes.json();
+      if (err.message?.includes('Bad credentials')) {
+        localStorage.removeItem(GH_TOKEN_KEY);
+        alert('Invalid token. Cleared — try again.');
+      } else {
+        alert('Push failed: ' + err.message);
+      }
+    }
+  } catch(e) {
+    alert('Push failed: ' + e.message);
+  }
 }
 
 async function loadFromJsonFile() {
   try {
-    const res = await fetch('schema-v2.json?t=' + Date.now());
+    const res = await fetch(`https://raw.githubusercontent.com/${GITHUB_REPO}/main/${GITHUB_FILE}?t=${Date.now()}`);
     if (res.ok) {
       const data = await res.json();
-      Object.assign(schemaV2, data);
+      // Apply notes from saved changes back to schemaV2
+      if (data.changes) {
+        for (const row of data.changes) {
+          if (row.notes && schemaV2.tables[row.table]) {
+            schemaV2.tables[row.table].notes = row.notes;
+          }
+        }
+      }
       return true;
     }
   } catch(e) {}
