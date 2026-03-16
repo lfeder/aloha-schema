@@ -846,7 +846,7 @@ function updatePersistIndicator(status) {
 // Load on startup: try JSON file first, then localStorage
 loadFromGit().then(loaded => {
   if (!loaded) loadFromStorage();
-  else render();
+  render();
 });
 
 function setViewMode(mode) {
@@ -1859,8 +1859,7 @@ document.addEventListener('dragend', () => {
   document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
 });
 
-// Initial render
-render();
+// Initial render (loadFromGit handles re-render on success)
 </script>
 </body>
 </html>
