@@ -196,7 +196,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
   </div>
   <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="display:none">&laquo;</button>
   <div class="sidebar" id="sidebar">
-    <h2 style="display:flex;align-items:center;justify-content:space-between">Change Log <button onclick="exportSchemaJson()" style="font-size:11px;background:none;border:1px solid #2a2a3a;color:#888;cursor:pointer;padding:3px 10px;border-radius:4px">Save to Git</button></h2>
+    <h2 style="display:flex;align-items:center;justify-content:space-between">Change Log <button onclick="saveToGit()" style="font-size:11px;background:none;border:1px solid #2a2a3a;color:#888;cursor:pointer;padding:3px 10px;border-radius:4px">Save to Git</button></h2>
     <div id="diffContent"><p class="no-diff">Switch to V2 to see differences.</p></div>
     <div id="sidebarActions" style="margin-top:16px;display:none;">
       <button class="add-table-btn" onclick="openAddTable()" style="width:100%">+ Add Table</button>
@@ -844,7 +844,7 @@ function updatePersistIndicator(status) {
 }
 
 // Load on startup: try JSON file first, then localStorage
-loadFromJsonFile().then(loaded => {
+loadFromGit().then(loaded => {
   if (!loaded) loadFromStorage();
   else render();
 });
@@ -1018,36 +1018,51 @@ function onChangelogSort(col) {
   render();
 }
 
-function exportChangelogCsv() {
+
+const GITHUB_REPO = 'lfeder/aloha-schema';
+const GITHUB_FILE = 'schema-changes.csv';
+const GH_TOKEN_KEY = 'aloha_gh_token';
+
+function csvEscape(v) { return '"' + (v || '').replace(/"/g, '""') + '"'; }
+
+function buildCsvFromChangelog() {
   const diffs = computeDiff(schemaV1, schemaV2);
-  const rows = sortChangelogRows(buildChangelogRows(diffs));
-  const csvEscape = (v) => '"' + (v || '').replace(/"/g, '""') + '"';
+  const rows = buildChangelogRows(diffs);
   const lines = ['table,type,detail,notes'];
   for (const r of rows) {
     lines.push([csvEscape(r.table), csvEscape(r.type), csvEscape(r.detail), csvEscape(r.notes)].join(','));
   }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'change_log.csv';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  return lines.join('\n');
 }
 
-const GITHUB_REPO = 'lfeder/aloha-schema';
-const GITHUB_FILE = 'schema-changes.json';
-const GH_TOKEN_KEY = 'aloha_gh_token';
-
-function getChangesPayload() {
-  const diffs = computeDiff(schemaV1, schemaV2);
-  const rows = buildChangelogRows(diffs);
-  return {
-    exported_at: new Date().toISOString(),
-    changes: rows
-  };
+function parseCsv(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  if (lines.length < 2) return rows;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const vals = [];
+    let cur = '', inQ = false;
+    for (let j = 0; j < line.length; j++) {
+      const c = line[j];
+      if (inQ) {
+        if (c === '"' && line[j+1] === '"') { cur += '"'; j++; }
+        else if (c === '"') inQ = false;
+        else cur += c;
+      } else {
+        if (c === '"') inQ = true;
+        else if (c === ',') { vals.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    vals.push(cur);
+    if (vals.length >= 4) rows.push({ table: vals[0], type: vals[1], detail: vals[2], notes: vals[3] });
+  }
+  return rows;
 }
 
-async function exportSchemaJson() {
+async function saveToGit() {
   let token = localStorage.getItem(GH_TOKEN_KEY);
   if (!token) {
     token = prompt('Enter a GitHub personal access token (needs repo scope).\nThis is stored in your browser only.');
@@ -1055,13 +1070,10 @@ async function exportSchemaJson() {
     localStorage.setItem(GH_TOKEN_KEY, token);
   }
 
-  const payload = getChangesPayload();
-  if (!payload.changes.length) { alert('No changes to save.'); return; }
-
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+  const csv = buildCsvFromChangelog();
+  const content = btoa(unescape(encodeURIComponent(csv)));
 
   try {
-    // Get current file SHA if it exists
     let sha;
     const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
       headers: { 'Authorization': `token ${token}` }
@@ -1071,11 +1083,7 @@ async function exportSchemaJson() {
       sha = existing.sha;
     }
 
-    const body = {
-      message: 'Update schema changes',
-      content,
-      branch: 'main'
-    };
+    const body = { message: 'Update schema changes', content, branch: 'main' };
     if (sha) body.sha = sha;
 
     const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
@@ -1086,32 +1094,30 @@ async function exportSchemaJson() {
 
     if (putRes.ok) {
       updatePersistIndicator('saved');
-      alert('Changes pushed to GitHub.');
+      alert('Changes saved to GitHub.');
     } else {
       const err = await putRes.json();
       if (err.message?.includes('Bad credentials')) {
         localStorage.removeItem(GH_TOKEN_KEY);
         alert('Invalid token. Cleared — try again.');
       } else {
-        alert('Push failed: ' + err.message);
+        alert('Save failed: ' + err.message);
       }
     }
   } catch(e) {
-    alert('Push failed: ' + e.message);
+    alert('Save failed: ' + e.message);
   }
 }
 
-async function loadFromJsonFile() {
+async function loadFromGit() {
   try {
     const res = await fetch(`https://raw.githubusercontent.com/${GITHUB_REPO}/main/${GITHUB_FILE}?t=${Date.now()}`);
     if (res.ok) {
-      const data = await res.json();
-      // Apply notes from saved changes back to schemaV2
-      if (data.changes) {
-        for (const row of data.changes) {
-          if (row.notes && schemaV2.tables[row.table]) {
-            schemaV2.tables[row.table].notes = row.notes;
-          }
+      const text = await res.text();
+      const rows = parseCsv(text);
+      for (const row of rows) {
+        if (row.notes && schemaV2.tables[row.table]) {
+          schemaV2.tables[row.table].notes = row.notes;
         }
       }
       return true;
