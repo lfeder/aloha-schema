@@ -192,7 +192,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
     <div class="cf-container" id="coreFlowContainer"><svg id="coreFlowSvg"></svg><div id="coreFlowContent"></div><button class="add-table-btn" onclick="openAddTable(true)" style="position:absolute;bottom:16px;right:16px;z-index:20">+ Add Table</button></div>
   </div>
   <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="display:none">&laquo;</button>
-  <div class="sidebar collapsed" id="sidebar">
+  <div class="sidebar" id="sidebar">
     <h2 style="display:flex;align-items:center;justify-content:space-between">Change Log <button onclick="exportChangelogCsv()" style="font-size:11px;background:none;border:1px solid #2a2a3a;color:#888;cursor:pointer;padding:3px 10px;border-radius:4px">Export CSV</button></h2>
     <div id="diffContent"><p class="no-diff">Switch to V2 to see differences.</p></div>
     <div id="sidebarActions" style="margin-top:16px;display:none;">
@@ -801,7 +801,7 @@ function buildGroups(schema) {
 
 let currentVersion = 'v2';
 let hoveredTable = null;
-let sidebarManualCollapsed = true;
+let sidebarManualCollapsed = false;
 let compactMode = false;
 let coreFlowMode = false;
 
