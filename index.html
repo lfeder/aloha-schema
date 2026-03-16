@@ -1009,17 +1009,55 @@ function renderChangelog(diffs, container) {
       <th class="${sortedClass('type')}" onclick="onChangelogSort('type')">Type ${arrow('type')}</th>
       <th class="${sortedClass('detail')}" onclick="onChangelogSort('detail')">Detail ${arrow('detail')}</th>
       <th class="${sortedClass('notes')}" onclick="onChangelogSort('notes')">Notes ${arrow('notes')}</th>
+      <th></th>
     </tr></thead><tbody>`;
   for (const r of sorted) {
+    const safeDetail = r.detail.replace(/'/g, "\\'").replace(/"/g, '&quot;');
     html += `<tr>
       <td class="cl-table">${r.table}</td>
       <td><span class="cl-type ${r.type}">${r.type}</span></td>
       <td>${r.detail}</td>
       <td class="cl-notes" title="${(r.notes || '').replace(/"/g, '&quot;')}">${r.notes || ''}</td>
+      <td><button onclick="revertChange('${r.table}','${r.type}','${safeDetail}')" style="background:none;border:none;color:#555;cursor:pointer;font-size:12px" title="Revert this change">&times;</button></td>
     </tr>`;
   }
   html += '</tbody></table>';
   container.innerHTML = html;
+}
+
+function revertChange(table, type, detail) {
+  if (type === 'note') {
+    // Remove notes
+    if (schemaV2.tables[table]) schemaV2.tables[table].notes = '';
+  } else if (type === 'added' && detail === 'Table added') {
+    // Delete the added table
+    delete schemaV2.tables[table];
+    schemaV2.foreignKeys = schemaV2.foreignKeys.filter(fk => !fk.from.startsWith(table + '.') && !fk.to.startsWith(table + '.'));
+  } else if (type === 'removed' && detail === 'Table removed') {
+    // Restore from V1
+    if (schemaV1.tables[table]) {
+      schemaV2.tables[table] = JSON.parse(JSON.stringify(schemaV1.tables[table]));
+      for (const fk of schemaV1.foreignKeys) {
+        if (fk.from.startsWith(table + '.')) schemaV2.foreignKeys.push(JSON.parse(JSON.stringify(fk)));
+      }
+    }
+  } else if (type === 'modified' && detail.startsWith('Column')) {
+    // Revert single column to V1
+    const match = detail.match(/Column "(\w+)"/);
+    if (match) {
+      const colName = match[1];
+      const v1t = schemaV1.tables[table];
+      if (v1t) {
+        const v1col = v1t.columns.find(c => c.name === colName);
+        if (v1col) {
+          const idx = schemaV2.tables[table].columns.findIndex(c => c.name === colName);
+          if (idx !== -1) schemaV2.tables[table].columns[idx] = JSON.parse(JSON.stringify(v1col));
+        }
+      }
+    }
+  }
+  save();
+  render();
 }
 
 function onChangelogSort(col) {
