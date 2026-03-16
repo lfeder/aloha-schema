@@ -1454,17 +1454,40 @@ function openAddTable(markCore) {
   `, () => saveNewTable());
 }
 
+function getV1Col(tableName, colName) {
+  const v1t = schemaV1.tables[tableName];
+  if (!v1t) return null;
+  return v1t.columns.find(c => c.name === colName) || null;
+}
+
 function colRowHtml(col, idx, tableName) {
   const typeOptions = COL_TYPES.map(t => `<option value="${t}"${t === col.type ? ' selected' : ''}>${t}</option>`).join('');
   const fkTarget = tableName ? (schemaV2.foreignKeys.find(fk => fk.from === tableName + '.' + col.name) || {}).to || '' : '';
-  return `<div class="modal-col-row" data-idx="${idx}">
+  const v1col = tableName ? getV1Col(tableName, col.name) : null;
+  const changed = v1col && (v1col.type !== col.type || v1col.nullable !== col.nullable || (v1col.default || '') !== (col.default || ''));
+  const highlight = changed ? 'border-left:3px solid #E0C45A;' : '';
+  const revertBtn = changed ? `<button class="modal-col-del" onclick="revertCol('${tableName}','${col.name}')" title="Revert to V1" style="color:#E0C45A">&#8635;</button>` : '';
+  return `<div class="modal-col-row" data-idx="${idx}" style="${highlight}">
     <input class="col-name-input" value="${col.name}" placeholder="column_name">
     <select class="col-type-input">${typeOptions}</select>
     <label style="display:flex;align-items:center;gap:3px;flex-shrink:0"><input type="checkbox" class="col-nullable-cb"${col.nullable ? ' checked' : ''}><span class="modal-col-label">null</span></label>
     <input style="width:90px;flex-shrink:0" class="col-default-input" value="${col.default || ''}" placeholder="default">
     <input style="width:100px;flex-shrink:0" class="col-fk-input" value="${fkTarget}" placeholder="FK table.col">
+    ${revertBtn}
     <button class="modal-col-del" onclick="this.closest('.modal-col-row').remove()" title="Remove">&times;</button>
   </div>`;
+}
+
+function revertCol(tableName, colName) {
+  const v1col = getV1Col(tableName, colName);
+  if (!v1col) return;
+  const tbl = schemaV2.tables[tableName];
+  const idx = tbl.columns.findIndex(c => c.name === colName);
+  if (idx === -1) return;
+  tbl.columns[idx] = JSON.parse(JSON.stringify(v1col));
+  save();
+  closeModal();
+  setTimeout(() => openEditTable(tableName), 50);
 }
 
 function addColumnRow() {
@@ -1565,6 +1588,23 @@ function saveNewTable() {
   save();
   if (coreFlowMode) renderCoreFlow();
   else render();
+}
+
+function resetToV1(tableName) {
+  const v1Table = schemaV1.tables[tableName];
+  if (!v1Table) { alert('This table does not exist in V1.'); return; }
+  const notes = schemaV2.tables[tableName]?.notes || '';
+  schemaV2.tables[tableName] = JSON.parse(JSON.stringify(v1Table));
+  if (notes) schemaV2.tables[tableName].notes = notes;
+  // Reset FKs for this table
+  schemaV2.foreignKeys = schemaV2.foreignKeys.filter(fk => !fk.from.startsWith(tableName + '.'));
+  for (const fk of schemaV1.foreignKeys) {
+    if (fk.from.startsWith(tableName + '.')) {
+      schemaV2.foreignKeys.push(JSON.parse(JSON.stringify(fk)));
+    }
+  }
+  save();
+  render();
 }
 
 function deleteTable(tableName) {
