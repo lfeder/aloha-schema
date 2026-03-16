@@ -167,7 +167,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
 
 <div class="topbar">
   <h1>Aloha Schema</h1>
-  <span style="font-size:10px;color:#999">v: 03-16 02:25</span>
+  <span style="font-size:10px;color:#999">v: 03-16 02:28</span>
   <div class="version-toggle">
     <button id="btnV1" onclick="setVersion('v1')">V1</button>
     <button id="btnV2" class="active" onclick="setVersion('v2')">V2</button>
@@ -1114,7 +1114,7 @@ async function saveToGit() {
 
 async function loadFromGit() {
   try {
-    const res = await fetch(`https://raw.githubusercontent.com/${GITHUB_REPO}/main/${GITHUB_FILE}?t=${Date.now()}`);
+    const res = await fetch(`${GITHUB_FILE}?t=${Date.now()}`);
     if (res.ok) {
       const text = await res.text();
       const rows = parseCsv(text);
