@@ -172,8 +172,11 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
     <button id="btnV1" onclick="setVersion('v1')">V1</button>
     <button id="btnV2" class="active" onclick="setVersion('v2')">V2</button>
   </div>
-  <button id="btnCompact" class="compact-btn" onclick="toggleCompact()">Compact</button>
-  <button id="btnCoreFlow" class="compact-btn" onclick="toggleCoreFlow()">Core Flow</button>
+  <div class="version-toggle">
+    <button id="btnDetail" class="active" onclick="setViewMode('detail')">Detail</button>
+    <button id="btnCompact" onclick="setViewMode('compact')">Compact</button>
+    <button id="btnCoreFlow" onclick="setViewMode('core')">Core</button>
+  </div>
   <button class="compact-btn" onclick="exportSchemaJson()" title="Push changes to GitHub">Push Changes</button>
   <input type="text" class="search-box" id="searchBox" placeholder="Search tables..." oninput="filterTables()">
   <div class="stats">
@@ -847,11 +850,24 @@ loadFromJsonFile().then(loaded => {
   else render();
 });
 
-function toggleCompact() {
-  compactMode = !compactMode;
-  document.getElementById('btnCompact').classList.toggle('active', compactMode);
+function setViewMode(mode) {
+  compactMode = mode === 'compact';
+  coreFlowMode = mode === 'core';
+  document.getElementById('btnDetail').classList.toggle('active', mode === 'detail');
+  document.getElementById('btnCompact').classList.toggle('active', mode === 'compact');
+  document.getElementById('btnCoreFlow').classList.toggle('active', mode === 'core');
   document.getElementById('canvas').classList.toggle('compact', compactMode);
-  requestAnimationFrame(drawLines);
+  if (coreFlowMode) {
+    document.getElementById('canvas').style.display = 'none';
+    document.getElementById('svgOverlay').style.display = 'none';
+    renderCoreFlow();
+    document.getElementById('coreFlowContainer').style.display = 'block';
+  } else {
+    document.getElementById('coreFlowContainer').style.display = 'none';
+    document.getElementById('canvas').style.display = '';
+    document.getElementById('svgOverlay').style.display = '';
+    render();
+  }
 }
 
 function sortColumns(mergedCols, tableName, fkCols) {
@@ -1626,21 +1642,6 @@ function getCoreSet() {
   return new Set(schemaV2.coreTables || []);
 }
 
-function toggleCoreFlow() {
-  coreFlowMode = !coreFlowMode;
-  document.getElementById('btnCoreFlow').classList.toggle('active', coreFlowMode);
-  if (coreFlowMode) {
-    document.getElementById('canvas').style.display = 'none';
-    document.getElementById('svgOverlay').style.display = 'none';
-    renderCoreFlow();
-    document.getElementById('coreFlowContainer').style.display = 'block';
-  } else {
-    document.getElementById('coreFlowContainer').style.display = 'none';
-    document.getElementById('canvas').style.display = '';
-    document.getElementById('svgOverlay').style.display = '';
-    render();
-  }
-}
 
 function renderCoreFlow() {
   const schema = schemaV2;
