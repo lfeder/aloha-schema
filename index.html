@@ -1069,6 +1069,24 @@ function parseCsv(text) {
   return rows;
 }
 
+async function pushFile(token, path, content, message) {
+  const encoded = btoa(unescape(encodeURIComponent(content)));
+  let sha;
+  const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`, {
+    headers: { 'Authorization': `token ${token}` }
+  });
+  if (getRes.ok) sha = (await getRes.json()).sha;
+
+  const body = { message, content: encoded, branch: 'main' };
+  if (sha) body.sha = sha;
+
+  return fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`, {
+    method: 'PUT',
+    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+
 async function saveToGit() {
   let token = localStorage.getItem(GH_TOKEN_KEY);
   if (!token) {
@@ -1077,33 +1095,21 @@ async function saveToGit() {
     localStorage.setItem(GH_TOKEN_KEY, token);
   }
 
-  const csv = buildCsvFromChangelog();
-  const content = btoa(unescape(encodeURIComponent(csv)));
-
   try {
-    let sha;
-    const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-      headers: { 'Authorization': `token ${token}` }
-    });
-    if (getRes.ok) {
-      const existing = await getRes.json();
-      sha = existing.sha;
-    }
+    // Push both JSON (full state) and CSV (readable changelog)
+    const jsonContent = JSON.stringify(schemaV2, null, 2);
+    const csvContent = buildCsvFromChangelog();
 
-    const body = { message: 'Update schema changes', content, branch: 'main' };
-    if (sha) body.sha = sha;
+    const [jsonRes, csvRes] = await Promise.all([
+      pushFile(token, 'schema-v2.json', jsonContent, 'Update V2 schema'),
+      pushFile(token, GITHUB_FILE, csvContent, 'Update changelog CSV')
+    ]);
 
-    const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-      method: 'PUT',
-      headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (putRes.ok) {
+    if (jsonRes.ok && csvRes.ok) {
       updatePersistIndicator('saved');
       alert('Changes saved to GitHub.');
     } else {
-      const err = await putRes.json();
+      const err = await (jsonRes.ok ? csvRes : jsonRes).json();
       if (err.message?.includes('Bad credentials')) {
         localStorage.removeItem(GH_TOKEN_KEY);
         alert('Invalid token. Cleared — try again.');
@@ -1118,15 +1124,16 @@ async function saveToGit() {
 
 async function loadFromGit() {
   try {
-    const res = await fetch(`${GITHUB_FILE}?t=${Date.now()}`);
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status} ${res.statusText}` };
-    const text = await res.text();
-    if (!text.startsWith('table,')) return { ok: false, error: 'Not a CSV: ' + text.substring(0, 40) };
-    const rows = parseCsv(text);
-    for (const row of rows) {
-      if (row.notes && schemaV2.tables[row.table]) {
-        schemaV2.tables[row.table].notes = row.notes;
-      }
+    // Load full V2 state from JSON
+    const jsonRes = await fetch(`schema-v2.json?t=${Date.now()}`);
+    if (!jsonRes.ok) return { ok: false, error: `JSON HTTP ${jsonRes.status}` };
+    const data = await jsonRes.json();
+    if (data.tables) {
+      schemaV2.tables = data.tables;
+      schemaV2.foreignKeys = data.foreignKeys || schemaV2.foreignKeys;
+      if (data.coreTables) schemaV2.coreTables = data.coreTables;
+      if (data.corePositions) schemaV2.corePositions = data.corePositions;
+      if (data.tableOrder) schemaV2.tableOrder = data.tableOrder;
     }
     return { ok: true };
   } catch(e) {
