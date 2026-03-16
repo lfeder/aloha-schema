@@ -1,4 +1,4 @@
-<!-- v: 03-15 12:30 -->
+<!-- v: 03-16 02:20 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -167,7 +167,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
 
 <div class="topbar">
   <h1>Aloha Schema</h1>
-  <span style="font-size:10px;color:#999">v: 03-16 02:13 HST</span>
+  <span style="font-size:10px;color:#999">v: 03-16 02:15</span>
   <div class="version-toggle">
     <button id="btnV1" onclick="setVersion('v1')">V1</button>
     <button id="btnV2" class="active" onclick="setVersion('v2')">V2</button>
@@ -1859,7 +1859,8 @@ document.addEventListener('dragend', () => {
   document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
 });
 
-// Initial render (loadFromGit handles re-render on success)
+// Render immediately, then re-render after git data loads
+render();
 </script>
 </body>
 </html>
