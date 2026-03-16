@@ -167,7 +167,6 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
 
 <div class="topbar">
   <h1>Aloha Schema</h1>
-  <span style="font-size:10px;color:#999" id="versionStamp"></span>
   <div class="version-toggle">
     <button id="btnV1" onclick="setVersion('v1')">V1</button>
     <button id="btnV2" class="active" onclick="setVersion('v2')">V2</button>
@@ -184,6 +183,7 @@ body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMac
     <span><span class="num" id="statCols">0</span> columns</span>
     <span><span class="num" id="statFKs">0</span> FKs</span>
     <span style="font-size:10px;color:#999;font-style:italic">ID, audit fields hidden</span>
+    <span style="font-size:10px;color:#999" id="versionStamp"></span>
     <span id="persistStatus" class="persist-indicator"></span>
   </div>
 </div>
@@ -846,6 +846,10 @@ function updatePersistIndicator(status) {
   if (status === 'saved') setTimeout(() => { el.textContent = ''; }, 1500);
 }
 
+const GITHUB_REPO = 'lfeder/aloha-schema';
+const GITHUB_FILE = 'schema-changes.csv';
+const GH_TOKEN_KEY = 'aloha_gh_token';
+
 // Load on startup: try git CSV first, then localStorage
 loadFromGit().then(result => {
   if (!result.ok) loadFromStorage();
@@ -1025,9 +1029,6 @@ function onChangelogSort(col) {
 }
 
 
-const GITHUB_REPO = 'lfeder/aloha-schema';
-const GITHUB_FILE = 'schema-changes.csv';
-const GH_TOKEN_KEY = 'aloha_gh_token';
 
 function csvEscape(v) { return '"' + (v || '').replace(/"/g, '""') + '"'; }
 
